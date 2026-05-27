@@ -1,0 +1,101 @@
+import serial
+import sys 
+
+# --- COBS Decode Funktion ---
+def cobs_decode(data: bytes) -> bytes:
+    """Dekodiert ein COBS-kodiertes Frame (ohne abschließendes 0x00)."""
+    output = bytearray()
+    idx = 0
+    while idx < len(data):
+        code = data[idx]
+        idx += 1
+        if code == 0 or idx + code - 1 > len(data) + 1:
+            raise ValueError("Ungültiges COBS-Frame wegen code")
+        for i in range(code - 1):
+            if idx >= len(data):
+                raise ValueError("Ungültiges COBS-Frame wegen Range")
+            output.append(data[idx])
+            idx += 1
+        if code < 0xFF and idx < len(data):
+            output.append(0)
+    return bytes(output)
+
+# --- Serielle Schnittstelle öffnen ---
+ser = serial.Serial(
+    port="/dev/cu.usbserial-A50285BI",   # Raspi UART (GPIO RX/TX)
+    baudrate=115200,
+    timeout=1
+)
+
+print("Warte auf Daten...")
+#ser.write(b"\x04\xC9\xFF\xC8\x00")
+#ser.write(b"\x02\x63\x02\x28\x02\x8B\x00")
+
+ser.write(b"\x02\x63\x04\x90\x01\xF4\x00")
+ser.write(b"\x05\x01\x02\xFF\x02\x00")
+buffer = bytearray()
+count_0630 = 0
+
+while True:
+    byte = ser.read(1)
+    if not byte:
+        continue
+
+    if byte == b'\x00':  # Frame-Ende
+        if buffer:
+            #print("Frame RAW:", buffer.hex(" "))
+            try:
+                decoded = cobs_decode(buffer)
+                #print("Decoded:     ", decoded.hex(" "))
+                code= int.from_bytes(decoded[0:2], "little", signed=True)
+                #print("Code  ", hex(code))
+                if code==0x0601:
+                    dist=int.from_bytes(decoded[6:10], "little", signed=True)
+                    print("Entfernung in cm", dist/58)
+                    count_0630 += 1
+                if code==0x0630:
+                    rev=int.from_bytes(decoded[6:10], "little", signed=True)
+                    print("Drehzahl rechts", rev)
+                    count_0630 += 1
+                if code==0x0635:
+                    revl=int.from_bytes(decoded[6:10], "little", signed=True)
+                    print("Drehzahl links", revl)
+                    count_0630 += 1    
+                if count_0630 == 30:
+                        #ser.write(b"\x04\xC9\x80\x49\x00")
+                    ser.write(b"\x05\x01\x02\x80\x83\x00")
+                        #print(">>> Kommando \x02\xC9\x01\x00 gesendet <<<")
+                    sys.exit(0)
+                if code==0x00B4:
+                    #ax = int.from_bytes(decoded[7:9], "big", signed=True)
+                    #ay = int.from_bytes(decoded[9:11], "big", signed=True)
+                    #az = int.from_bytes(decoded[11:13], "big", signed=True)
+                    ax = int.from_bytes(decoded[6:8], "little", signed=True)
+                    ay = int.from_bytes(decoded[8:10], "little", signed=True)
+                    az = int.from_bytes(decoded[10:12], "little", signed=True)
+                    print("ax=",ax)
+                    print("ay=",ay)
+                    print("az=",az)
+                
+               #if len(decoded) == 12:  # unser Paketformat
+                    #identifier = decoded[0]
+                    #dateCode = int.from_bytes(decoded[1:5], "little")
+                    #ax = int.from_bytes(decoded[5:7], "little", signed=True)
+                    #ay = int.from_bytes(decoded[7:9], "little", signed=True)
+                    #az = int.from_bytes(decoded[9:11], "little", signed=True)
+                    #checksum = decoded[11]
+
+                    # Checksumme prüfen
+                    #if (sum(decoded[:-1]) & 0xFF) == checksum:
+                        #print(f"ID={identifier}, DateCode={dateCode}, "
+                              #f"X={ax}, Y={ay}, Z={az}")
+                    #else:
+                        #print("Checksumme falsch!")
+                #else:
+                    #print("Unerwartete Paketlänge:", len(decoded))
+            except Exception as e:
+                print("Dekodierfehler:", e)
+        buffer.clear()
+    else:
+        buffer.extend(byte)
+
