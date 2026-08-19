@@ -116,6 +116,7 @@ class App:
         self.root.title("Labor3 – 3 Umdrehungen")
         self.root.configure(bg="#1e1e2e")
         self.root.resizable(False, False)
+        self.root.geometry("480x780")
 
         self._running = False
         self._ser = None
@@ -136,7 +137,7 @@ class App:
         tk.Label(outer, text="3-Umdrehungen Test", bg="#1e1e2e", fg="#cba6f7",
                  font=("Helvetica", 18, "bold")).pack(pady=(0, 16))
 
-        # --- Port-Auswahl (identisch mit Labor3_Drehzahl) ---
+        # --- Port-Auswahl ---
         port_frame = tk.Frame(outer, bg="#313244", padx=12, pady=10)
         port_frame.pack(fill=tk.X, pady=(0, 16))
 
@@ -145,7 +146,7 @@ class App:
 
         self._port_var = tk.StringVar()
         self._port_cb = ttk.Combobox(port_frame, textvariable=self._port_var,
-                                     state="readonly", width=30,
+                                     state="readonly", width=22,
                                      font=("Helvetica", 10))
         self._port_cb.grid(row=0, column=1, padx=(0, 8))
         self._port_cb.bind("<<ComboboxSelected>>", lambda _: self._connect())
@@ -163,30 +164,31 @@ class App:
             command=self._disconnect, state="disabled")
         self._btn_disconnect.grid(row=0, column=3)
 
-        # --- Gauges ---
-        self.gauge_rpm = SpeedGauge(outer, "Aktuelle Drehzahl", MAX_RPM, width=420)
+        # --- Drehzahl-Gauge ---
+        self.gauge_rpm = SpeedGauge(outer, "Aktuelle Drehzahl", MAX_RPM, width=432)
         self.gauge_rpm.pack(fill=tk.X, pady=4)
 
-        self.gauge_rev = RevGauge(outer, TARGET_REVS, width=420)
+        # --- Umdrehungs-Gauge ---
+        self.gauge_rev = RevGauge(outer, TARGET_REVS, width=432)
         self.gauge_rev.pack(fill=tk.X, pady=4)
 
-        # --- Numerische Anzeigen ---
-        num_frame = tk.Frame(outer, bg="#1e1e2e")
-        num_frame.pack(fill=tk.X, pady=(12, 0))
-
+        # --- Aktuelle Drehzahl (numerisch) ---
+        f1 = tk.Frame(outer, bg="#313244", padx=16, pady=10)
+        f1.pack(fill=tk.X, pady=(12, 4))
+        tk.Label(f1, text="Aktuelle Drehzahl", bg="#313244", fg="#6c7086",
+                 font=("Helvetica", 10)).pack()
         self._lbl_rpm = tk.StringVar(value="0 rpm")
-        self._lbl_max = tk.StringVar(value="– rpm")
+        tk.Label(f1, textvariable=self._lbl_rpm, bg="#313244", fg="#89dceb",
+                 font=("Helvetica", 20, "bold")).pack()
 
-        for col, (txt, var) in enumerate([
-                ("Aktuelle Drehzahl", self._lbl_rpm),
-                ("Max. Drehzahl", self._lbl_max)]):
-            f = tk.Frame(num_frame, bg="#313244", padx=16, pady=10)
-            f.grid(row=0, column=col, padx=6, sticky="nsew")
-            num_frame.columnconfigure(col, weight=1)
-            tk.Label(f, text=txt, bg="#313244", fg="#6c7086",
-                     font=("Helvetica", 10)).pack()
-            tk.Label(f, textvariable=var, bg="#313244", fg="#89dceb",
-                     font=("Helvetica", 20, "bold")).pack()
+        # --- Max Drehzahl (numerisch) ---
+        f2 = tk.Frame(outer, bg="#313244", padx=16, pady=10)
+        f2.pack(fill=tk.X, pady=(0, 0))
+        tk.Label(f2, text="Max. Drehzahl", bg="#313244", fg="#6c7086",
+                 font=("Helvetica", 10)).pack()
+        self._lbl_max = tk.StringVar(value="– rpm")
+        tk.Label(f2, textvariable=self._lbl_max, bg="#313244", fg="#89dceb",
+                 font=("Helvetica", 20, "bold")).pack()
 
         # --- Start-Button ---
         self._btn_start = tk.Button(
@@ -227,7 +229,7 @@ class App:
             self._running = True
             self._thread = threading.Thread(target=self._read_loop, daemon=True)
             self._thread.start()
-            self._ser.write(CMD_INIT_SPEED)  # Gerät in Reporting-Modus versetzen
+            self._ser.write(CMD_INIT_SPEED)
             self._status.set(f"Verbunden: {port} @ {BAUD}")
             self._port_cb.config(state="disabled")
             self._btn_disconnect.config(state="normal")
@@ -246,14 +248,14 @@ class App:
             except Exception:
                 pass
         self._ser = None
-        self._btn_disconnect.config(state="disabled")
-        self._btn_start.config(state="disabled")
-        self._port_cb.config(state="readonly")
-        self._status.set("Getrennt.")
         self._lbl_rpm.set("0 rpm")
         self._lbl_max.set("– rpm")
         self.gauge_rpm.set_value(0)
         self.gauge_rev.set_value(0)
+        self._btn_disconnect.config(state="disabled")
+        self._btn_start.config(state="disabled")
+        self._port_cb.config(state="readonly")
+        self._status.set("Getrennt.")
 
     # ---------------------------------------------------------------- Motor --
 
@@ -321,7 +323,6 @@ class App:
             if code == 0x0630:
                 rpm = int.from_bytes(decoded[6:10], "little", signed=True)
                 now = time.time()
-
                 if self._counting:
                     dt = now - self._last_rpm_time
                     self._total_revs += max(0, rpm) * dt / 60.0
@@ -329,7 +330,6 @@ class App:
                         self._max_rpm = rpm
                     if self._total_revs >= TARGET_REVS:
                         self.root.after(0, self._stop_run)
-
                 self._last_rpm_time = now
                 self.root.after(0, self._update_display, rpm)
         except Exception:
