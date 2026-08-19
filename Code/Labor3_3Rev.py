@@ -84,7 +84,7 @@ class RevGauge(tk.Canvas):
         self.bind("<Configure>", lambda _: self._draw())
 
     def set_value(self, revs: float):
-        self._value = max(0.0, min(revs, self.target))
+        self._value = max(0.0, min(revs, float(self.target)))
         self._draw()
 
     def _draw(self):
@@ -120,6 +120,7 @@ class App:
         self._running = False
         self._ser = None
         self._thread = None
+        self._at_max = False
 
         self._counting = False
         self._total_revs = 0.0
@@ -135,7 +136,7 @@ class App:
         tk.Label(outer, text="3-Umdrehungen Test", bg="#1e1e2e", fg="#cba6f7",
                  font=("Helvetica", 18, "bold")).pack(pady=(0, 16))
 
-        # --- Port-Auswahl ---
+        # --- Port-Auswahl (identisch mit Labor3_Drehzahl) ---
         port_frame = tk.Frame(outer, bg="#313244", padx=12, pady=10)
         port_frame.pack(fill=tk.X, pady=(0, 16))
 
@@ -144,7 +145,8 @@ class App:
 
         self._port_var = tk.StringVar()
         self._port_cb = ttk.Combobox(port_frame, textvariable=self._port_var,
-                                     state="readonly", width=30, font=("Helvetica", 10))
+                                     state="readonly", width=30,
+                                     font=("Helvetica", 10))
         self._port_cb.grid(row=0, column=1, padx=(0, 8))
         self._port_cb.bind("<<ComboboxSelected>>", lambda _: self._connect())
 
@@ -168,9 +170,9 @@ class App:
         self.gauge_rev = RevGauge(outer, TARGET_REVS, width=420)
         self.gauge_rev.pack(fill=tk.X, pady=4)
 
-        # --- Ergebnisanzeige ---
-        result_frame = tk.Frame(outer, bg="#1e1e2e")
-        result_frame.pack(fill=tk.X, pady=(12, 0))
+        # --- Numerische Anzeigen ---
+        num_frame = tk.Frame(outer, bg="#1e1e2e")
+        num_frame.pack(fill=tk.X, pady=(12, 0))
 
         self._lbl_rpm = tk.StringVar(value="0 rpm")
         self._lbl_max = tk.StringVar(value="– rpm")
@@ -178,9 +180,9 @@ class App:
         for col, (txt, var) in enumerate([
                 ("Aktuelle Drehzahl", self._lbl_rpm),
                 ("Max. Drehzahl", self._lbl_max)]):
-            f = tk.Frame(result_frame, bg="#313244", padx=16, pady=10)
+            f = tk.Frame(num_frame, bg="#313244", padx=16, pady=10)
             f.grid(row=0, column=col, padx=6, sticky="nsew")
-            result_frame.columnconfigure(col, weight=1)
+            num_frame.columnconfigure(col, weight=1)
             tk.Label(f, text=txt, bg="#313244", fg="#6c7086",
                      font=("Helvetica", 10)).pack()
             tk.Label(f, textvariable=var, bg="#313244", fg="#89dceb",
@@ -188,7 +190,7 @@ class App:
 
         # --- Start-Button ---
         self._btn_start = tk.Button(
-            outer, text="▶  Start (3 Umdrehungen)",
+            outer, text="▶  Start  (3 Umdrehungen)",
             bg="#a6e3a1", fg="#1e1e2e", activebackground="#94d19a",
             font=("Helvetica", 13, "bold"), relief="flat",
             padx=20, pady=14, cursor="hand2",
@@ -225,6 +227,7 @@ class App:
             self._running = True
             self._thread = threading.Thread(target=self._read_loop, daemon=True)
             self._thread.start()
+            self._ser.write(CMD_INIT_SPEED)  # Gerät in Reporting-Modus versetzen
             self._status.set(f"Verbunden: {port} @ {BAUD}")
             self._port_cb.config(state="disabled")
             self._btn_disconnect.config(state="normal")
@@ -234,6 +237,7 @@ class App:
 
     def _disconnect(self):
         self._counting = False
+        self._at_max = False
         self._running = False
         if self._ser and self._ser.is_open:
             try:
@@ -246,9 +250,6 @@ class App:
         self._btn_start.config(state="disabled")
         self._port_cb.config(state="readonly")
         self._status.set("Getrennt.")
-        self._reset_display()
-
-    def _reset_display(self):
         self._lbl_rpm.set("0 rpm")
         self._lbl_max.set("– rpm")
         self.gauge_rpm.set_value(0)
@@ -263,6 +264,7 @@ class App:
         self._max_rpm = 0
         self._last_rpm_time = time.time()
         self._counting = True
+        self._at_max = True
         self._btn_start.config(state="disabled")
         self._lbl_max.set("– rpm")
         self.gauge_rev.set_value(0)
@@ -273,17 +275,19 @@ class App:
 
     def _stop_run(self):
         self._counting = False
+        self._at_max = False
         if self._ser and self._ser.is_open:
             try:
                 self._ser.write(CMD_STOP)
             except Exception:
                 pass
+        self.gauge_rev.set_value(TARGET_REVS)
         self._lbl_max.set(f"{self._max_rpm} rpm")
         self._status.set(f"Fertig – Max. Drehzahl: {self._max_rpm} rpm")
         self._btn_start.config(state="normal")
 
     def _keep_alive(self):
-        if not self._counting or not self._running:
+        if not self._at_max or not self._running:
             return
         if self._ser and self._ser.is_open:
             try:
