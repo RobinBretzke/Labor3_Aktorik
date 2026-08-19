@@ -26,7 +26,7 @@ def cobs_decode(data: bytes) -> bytes:
 
 BAUD           = 115200
 MAX_RPM        = 200
-TARGET_REVS    = 3
+TARGET_REVS    = 2.5
 
 CMD_INIT_SPEED = b"\x02\x63\x04\x90\x01\xF4\x00"
 CMD_MAX_SPEED  = b"\x05\x01\x02\xFF\x02\x00"
@@ -77,7 +77,7 @@ class SpeedGauge(tk.Canvas):
 
 class RevGauge(tk.Canvas):
 
-    def __init__(self, parent, target: int, **kwargs):
+    def __init__(self, parent, target: float, **kwargs):
         super().__init__(parent, height=120, bg="#1e1e2e", highlightthickness=0, **kwargs)
         self.target = target
         self._value = 0.0
@@ -116,7 +116,7 @@ class App:
         self.root.title("Labor3 – 3 Umdrehungen")
         self.root.configure(bg="#1e1e2e")
         self.root.resizable(False, False)
-        self.root.geometry("480x780")
+        self.root.geometry("480x840")
 
         self._running = False
         self._ser = None
@@ -197,7 +197,15 @@ class App:
             font=("Helvetica", 13, "bold"), relief="flat",
             padx=20, pady=14, cursor="hand2",
             command=self._start_run, state="disabled")
-        self._btn_start.pack(fill=tk.X, pady=(20, 0))
+        self._btn_start.pack(fill=tk.X, pady=(20, 4))
+
+        self._btn_abort = tk.Button(
+            outer, text="✕  Abbrechen",
+            bg="#f38ba8", fg="#1e1e2e", activebackground="#d97b96",
+            font=("Helvetica", 11, "bold"), relief="flat",
+            padx=20, pady=10, cursor="hand2",
+            command=self._abort_run, state="disabled")
+        self._btn_abort.pack(fill=tk.X)
 
         # --- Statuszeile ---
         self._status = tk.StringVar(value="Kein Gerät verbunden.")
@@ -254,6 +262,7 @@ class App:
         self.gauge_rev.set_value(0)
         self._btn_disconnect.config(state="disabled")
         self._btn_start.config(state="disabled")
+        self._btn_abort.config(state="disabled")
         self._port_cb.config(state="readonly")
         self._status.set("Getrennt.")
 
@@ -268,6 +277,7 @@ class App:
         self._counting = True
         self._at_max = True
         self._btn_start.config(state="disabled")
+        self._btn_abort.config(state="normal")
         self._lbl_max.set("– rpm")
         self.gauge_rev.set_value(0)
         self._status.set("Motor läuft – zähle Umdrehungen …")
@@ -287,6 +297,21 @@ class App:
         self._lbl_max.set(f"{self._max_rpm} rpm")
         self._status.set(f"Fertig – Max. Drehzahl: {self._max_rpm} rpm")
         self._btn_start.config(state="normal")
+        self._btn_abort.config(state="disabled")
+
+    def _abort_run(self):
+        self._counting = False
+        self._at_max = False
+        if self._ser and self._ser.is_open:
+            try:
+                self._ser.write(CMD_STOP)
+            except Exception:
+                pass
+        self.gauge_rev.set_value(0)
+        self._lbl_rpm.set("0 rpm")
+        self._status.set("Abgebrochen.")
+        self._btn_start.config(state="normal")
+        self._btn_abort.config(state="disabled")
 
     def _keep_alive(self):
         if not self._at_max or not self._running:
