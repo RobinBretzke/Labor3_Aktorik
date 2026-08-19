@@ -113,7 +113,7 @@ class RevGauge(tk.Canvas):
 class App:
     def __init__(self, root: tk.Tk):
         self.root = root
-        self.root.title("Labor3 – 3 Umdrehungen")
+        self.root.title("Labor3")
         self.root.configure(bg="#1e1e2e")
         self.root.resizable(False, False)
         self.root.geometry("480x840")
@@ -134,7 +134,7 @@ class App:
         outer = tk.Frame(self.root, bg="#1e1e2e", padx=24, pady=20)
         outer.pack(fill=tk.BOTH, expand=True)
 
-        tk.Label(outer, text="3-Umdrehungen Test", bg="#1e1e2e", fg="#cba6f7",
+        tk.Label(outer, text="", bg="#1e1e2e", fg="#cba6f7",
                  font=("Helvetica", 18, "bold")).pack(pady=(0, 16))
 
         # --- Port-Auswahl ---
