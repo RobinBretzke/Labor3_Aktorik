@@ -25,9 +25,12 @@ jobs:
       - name: EXE bauen
         run: |
           pyinstaller --onefile --windowed --name "Drehzahl_Monitor" Code/Labor3_Drehzahl.py
+          pyinstaller --onefile --windowed --name "Labor3_3Rev" Code/Labor3_3Rev.py
 
       - name: EXE als Artefakt hochladen
         uses: actions/upload-artifact@v4
         with:
           name: Drehzahl_Monitor_EXE
-          path: dist/Drehzahl_Monitor.exe
+          path: |
+            dist/Drehzahl_Monitor.exe
+            dist/Labor3_3Rev.exe
