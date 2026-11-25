@@ -8,7 +8,7 @@ on:
   push:
     branches: [main, master]
     paths:
-      - "**/code/Labor3_3Rev_plot.py"
+      - "**/Code/Labor3_3Rev_plot.py"
       - ".github/workflows/build-exe.yml"
     tags: ["v*"]
   workflow_dispatch:        # manuell starten: Actions -> Build Windows EXE -> Run workflow
@@ -17,7 +17,7 @@ permissions:
   contents: write           # nur für das Anhängen an Releases nötig
 
 env:
-  SCRIPT: Labor3_3Rev_plot.py   # Pfad relativ zum Repo-Root anpassen, falls in Unterordner
+  SCRIPT: Code/Labor3_3Rev_plot.py   # Pfad relativ zum Repo-Root anpassen, falls in Unterordner
   EXE_NAME: Labor3
 
 jobs:
