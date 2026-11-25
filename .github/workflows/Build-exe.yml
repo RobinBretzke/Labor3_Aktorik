@@ -8,7 +8,7 @@ on:
   push:
     branches: [main, master]
     paths:
-      - "**/Code/Labor3_3Rev_plot.py"
+      - "**/Labor3_3Rev_plot.py"
       - ".github/workflows/build-exe.yml"
     tags: ["v*"]
   workflow_dispatch:        # manuell starten: Actions -> Build Windows EXE -> Run workflow
