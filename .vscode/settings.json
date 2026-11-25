@@ -1,0 +1,6 @@
+{
+    "python.defaultInterpreterPath": "/opt/homebrew/bin/python3.12",
+    "code-runner.executorMap": {
+        "python": "/opt/homebrew/bin/python3.12 -u"
+    }
+}
