@@ -1,0 +1,67 @@
+# Baut aus Labor3_3Rev_plot.py eine Windows-.exe (PyInstaller, eine Datei)
+# Ergebnis: im Actions-Lauf unter "Artifacts" herunterladen.
+# Bei einem Tag wie v1.0 wird die .exe zusätzlich an ein GitHub-Release gehängt.
+
+name: Build Windows EXE
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "**/code/Labor3_3Rev_plot.py"
+      - ".github/workflows/build-exe.yml"
+    tags: ["v*"]
+  workflow_dispatch:        # manuell starten: Actions -> Build Windows EXE -> Run workflow
+
+permissions:
+  contents: write           # nur für das Anhängen an Releases nötig
+
+env:
+  SCRIPT: Labor3_3Rev_plot.py   # Pfad relativ zum Repo-Root anpassen, falls in Unterordner
+  EXE_NAME: Labor3
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Code auschecken
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Abhängigkeiten installieren
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyserial pyinstaller
+
+      - name: EXE bauen
+        run: >
+          pyinstaller
+          --onefile
+          --windowed
+          --name "${{ env.EXE_NAME }}"
+          --hidden-import serial.tools.list_ports
+          "${{ env.SCRIPT }}"
+
+      - name: Prüfen, ob die EXE existiert
+        shell: pwsh
+        run: |
+          $exe = "dist/${{ env.EXE_NAME }}.exe"
+          if (-not (Test-Path $exe)) { throw "EXE wurde nicht erzeugt" }
+          Get-Item $exe | Format-List Name, Length
+
+      - name: EXE als Artifact hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.EXE_NAME }}-windows
+          path: dist/${{ env.EXE_NAME }}.exe
+
+      - name: An Release anhängen (nur bei Tag v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/${{ env.EXE_NAME }}.exe
